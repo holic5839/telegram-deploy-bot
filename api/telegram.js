@@ -62,6 +62,15 @@ async function mergeBranch(branch) {
 export default async function handler(req, res) {
   console.log("telegram.js 실행됨");
   try {
+    // GET 요청 처리 (상태 확인용)
+    if (req.method === "GET") {
+      return res.status(200).json({
+        status: "OK",
+        message: "Telegram Deploy Bot is running",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     // HTTP 메서드 검증
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
