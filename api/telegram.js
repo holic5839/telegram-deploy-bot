@@ -19,14 +19,36 @@ async function sendTelegram(chatId, text, replyMarkup) {
 
 async function getBranches() {
   try {
-    const res = await axios.get(
-      `https://api.github.com/repos/${REPO}/branches`,
-      {
-        headers: { Authorization: `token ${GITHUB_TOKEN}` },
+    let allBranches = [];
+    let page = 1;
+    const perPage = 100; // GitHub API 최대값
+
+    while (true) {
+      const res = await axios.get(
+        `https://api.github.com/repos/${REPO}/branches`,
+        {
+          headers: { Authorization: `token ${GITHUB_TOKEN}` },
+          params: {
+            per_page: perPage,
+            page: page,
+          },
+        }
+      );
+
+      const branches = res.data.map((b) => b.name);
+      allBranches = allBranches.concat(branches);
+
+      // 더 이상 브랜치가 없으면 중단
+      if (branches.length < perPage) {
+        break;
       }
-    );
-    // dev 브랜치는 제외하고 반환
-    return res.data.map((b) => b.name).filter((n) => n !== "dev");
+
+      page++;
+    }
+
+    // dev, master, release, build 브랜치는 제외하고 반환
+    const excludedBranches = ["dev", "master", "release", "build"];
+    return allBranches.filter((name) => !excludedBranches.includes(name));
   } catch (error) {
     console.error("GitHub API error:", error.response?.data || error.message);
     throw new Error("브랜치 목록을 가져올 수 없습니다.");
