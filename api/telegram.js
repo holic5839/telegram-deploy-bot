@@ -60,6 +60,7 @@ async function mergeBranch(branch) {
 }
 
 export default async function handler(req, res) {
+  console.log("telegram.js 실행됨");
   try {
     // HTTP 메서드 검증
     if (req.method !== "POST") {
