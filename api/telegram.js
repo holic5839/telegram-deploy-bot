@@ -7,16 +7,30 @@ const ALLOWED_USER_ID = Number(process.env.ALLOWED_USER_ID);
 const CI_LOG_URL = process.env.CI_LOG_URL || "";
 
 async function sendTelegram(chatId, text, replyMarkup) {
-  const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
-  await axios.post(url, { chat_id: chatId, text, reply_markup: replyMarkup });
+  try {
+    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+    await axios.post(url, { chat_id: chatId, text, reply_markup: replyMarkup });
+    return { success: true };
+  } catch (error) {
+    console.error("Telegram API error:", error.response?.data || error.message);
+    return { success: false, error: error.message };
+  }
 }
 
 async function getBranches() {
-  const res = await axios.get(`https://api.github.com/repos/${REPO}/branches`, {
-    headers: { Authorization: `token ${GITHUB_TOKEN}` },
-  });
-  // dev 브랜치는 제외하고 반환
-  return res.data.map((b) => b.name).filter((n) => n !== "dev");
+  try {
+    const res = await axios.get(
+      `https://api.github.com/repos/${REPO}/branches`,
+      {
+        headers: { Authorization: `token ${GITHUB_TOKEN}` },
+      }
+    );
+    // dev 브랜치는 제외하고 반환
+    return res.data.map((b) => b.name).filter((n) => n !== "dev");
+  } catch (error) {
+    console.error("GitHub API error:", error.response?.data || error.message);
+    throw new Error("브랜치 목록을 가져올 수 없습니다.");
+  }
 }
 
 async function mergeBranch(branch) {
@@ -46,53 +60,116 @@ async function mergeBranch(branch) {
 }
 
 export default async function handler(req, res) {
-  const body = req.body;
-  const message = body.message;
-  const callback = body.callback_query;
-
-  if (message?.text === "/deploy") {
-    const chatId = message.chat.id;
-    if (chatId !== ALLOWED_USER_ID) {
-      await sendTelegram(chatId, "⚠️ 권한이 없습니다.");
-      return res.status(403).end();
+  try {
+    // HTTP 메서드 검증
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const branches = await getBranches();
-    const buttons = branches.map((b) => [
-      { text: b, callback_data: `deploy_${b}` },
-    ]);
+    const body = req.body;
+    const message = body.message;
+    const callback = body.callback_query;
 
-    await sendTelegram(chatId, "🔽 배포할 브랜치를 선택하세요:", {
-      inline_keyboard: buttons,
-    });
-    return res.status(200).end();
-  }
-
-  if (callback) {
-    const chatId = callback.message.chat.id;
-    if (chatId !== ALLOWED_USER_ID) return res.status(403).end();
-
-    const data = callback.data;
-    if (data.startsWith("deploy_")) {
-      const branch = data.replace("deploy_", "");
-      const result = await mergeBranch(branch);
-
-      if (result.success) {
-        await sendTelegram(
-          chatId,
-          `✅ [${branch}] 브랜치를 dev에 머지하고 배포를 시작했습니다.\n🔗 CI 로그: ${CI_LOG_URL}`
-        );
-      } else if (result.conflict) {
-        await sendTelegram(
-          chatId,
-          `❌ 병합 충돌 발생! [${branch}] → dev 수동 병합 필요\n오류: ${result.message}`
-        );
-      } else {
-        await sendTelegram(chatId, `❌ 오류 발생: ${result.message}`);
+    if (message?.text === "/deploy") {
+      const chatId = message.chat.id;
+      if (chatId !== ALLOWED_USER_ID) {
+        const result = await sendTelegram(chatId, "⚠️ 권한이 없습니다.");
+        if (!result.success) {
+          console.error("Failed to send unauthorized message:", result.error);
+        }
+        return res.status(200).json({ ok: true });
       }
-      return res.status(200).end();
-    }
-  }
 
-  return res.status(200).end();
+      try {
+        const branches = await getBranches();
+        const buttons = branches.map((b) => [
+          { text: b, callback_data: `deploy_${b}` },
+        ]);
+
+        const result = await sendTelegram(
+          chatId,
+          "🔽 배포할 브랜치를 선택하세요:",
+          {
+            inline_keyboard: buttons,
+          }
+        );
+
+        if (!result.success) {
+          console.error(
+            "Failed to send branch selection message:",
+            result.error
+          );
+          return res.status(500).json({ error: "Failed to send message" });
+        }
+      } catch (error) {
+        console.error("Error fetching branches:", error.message);
+        const result = await sendTelegram(
+          chatId,
+          "❌ 브랜치 목록을 가져오는데 실패했습니다."
+        );
+        if (!result.success) {
+          console.error("Failed to send error message:", result.error);
+        }
+      }
+
+      return res.status(200).json({ ok: true });
+    }
+
+    if (callback) {
+      const chatId = callback.message.chat.id;
+      if (chatId !== ALLOWED_USER_ID) {
+        return res.status(200).json({ ok: true });
+      }
+
+      const data = callback.data;
+      if (data.startsWith("deploy_")) {
+        const branch = data.replace("deploy_", "");
+
+        try {
+          const result = await mergeBranch(branch);
+
+          let messageResult;
+          if (result.success) {
+            messageResult = await sendTelegram(
+              chatId,
+              `✅ [${branch}] 브랜치를 dev에 머지하고 배포를 시작했습니다.\n🔗 CI 로그: ${CI_LOG_URL}`
+            );
+          } else if (result.conflict) {
+            messageResult = await sendTelegram(
+              chatId,
+              `❌ 병합 충돌 발생! [${branch}] → dev 수동 병합 필요\n오류: ${result.message}`
+            );
+          } else {
+            messageResult = await sendTelegram(
+              chatId,
+              `❌ 오류 발생: ${result.message}`
+            );
+          }
+
+          if (!messageResult.success) {
+            console.error(
+              "Failed to send merge result message:",
+              messageResult.error
+            );
+          }
+        } catch (error) {
+          console.error("Error during merge process:", error.message);
+          const result = await sendTelegram(
+            chatId,
+            `❌ 처리 중 오류 발생: ${error.message}`
+          );
+          if (!result.success) {
+            console.error("Failed to send error message:", result.error);
+          }
+        }
+      }
+
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error("Handler error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 }
