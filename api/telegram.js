@@ -3,7 +3,9 @@ import axios from "axios";
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const REPO = process.env.GITHUB_REPO;
-const ALLOWED_USER_ID = Number(process.env.ALLOWED_USER_ID);
+const ALLOWED_USER_IDS = process.env.ALLOWED_USER_ID
+  ? process.env.ALLOWED_USER_ID.split(",").map((id) => Number(id.trim()))
+  : [];
 const CI_LOG_URL = process.env.CI_LOG_URL || "";
 
 async function sendTelegram(chatId, text, replyMarkup) {
@@ -105,7 +107,7 @@ export default async function handler(req, res) {
     if (message?.text === "/deploy") {
       const chatId = message.chat.id;
       console.log("Chat ID:", chatId);
-      if (chatId !== ALLOWED_USER_ID) {
+      if (!ALLOWED_USER_IDS.includes(chatId)) {
         const result = await sendTelegram(chatId, "⚠️ 권한이 없습니다.");
         if (!result.success) {
           console.error("Failed to send unauthorized message:", result.error);
@@ -150,7 +152,7 @@ export default async function handler(req, res) {
 
     if (callback) {
       const chatId = callback.message.chat.id;
-      if (chatId !== ALLOWED_USER_ID) {
+      if (!ALLOWED_USER_IDS.includes(chatId)) {
         return res.status(200).json({ ok: true });
       }
 
