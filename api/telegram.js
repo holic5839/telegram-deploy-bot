@@ -49,7 +49,14 @@ async function getBranches() {
     }
 
     // dev, master, release, build 브랜치는 제외하고 반환
-    const excludedBranches = ["dev", "master", "release", "build"];
+    const excludedBranches = [
+      "dev",
+      "master",
+      "release",
+      "build",
+      "pre",
+      "release-kaist",
+    ];
     return allBranches.filter((name) => !excludedBranches.includes(name));
   } catch (error) {
     console.error("GitHub API error:", error.response?.data || error.message);
