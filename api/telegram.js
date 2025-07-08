@@ -104,6 +104,7 @@ export default async function handler(req, res) {
 
     if (message?.text === "/deploy") {
       const chatId = message.chat.id;
+      console.log("Chat ID:", chatId);
       if (chatId !== ALLOWED_USER_ID) {
         const result = await sendTelegram(chatId, "⚠️ 권한이 없습니다.");
         if (!result.success) {
