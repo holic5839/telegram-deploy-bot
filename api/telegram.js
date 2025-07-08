@@ -66,6 +66,19 @@ async function getBranches() {
 
 async function mergeBranch(branch) {
   try {
+    // dev 브랜치의 최신 상태 확인
+    const devBranchInfo = await axios.get(
+      `https://api.github.com/repos/${REPO}/branches/dev`,
+      {
+        headers: { Authorization: `token ${GITHUB_TOKEN}` },
+      }
+    );
+
+    console.log(
+      `Dev branch is up to date. Latest commit: ${devBranchInfo.data.commit.sha}`
+    );
+
+    // merge 실행
     await axios.post(
       `https://api.github.com/repos/${REPO}/merges`,
       {
