@@ -2,10 +2,16 @@
   "version": 2,
   "builds": [
     { "src": "api/telegram.js", "use": "@vercel/node" },
-    { "src": "api/notify.js", "use": "@vercel/node" }
+    { "src": "api/notify.js", "use": "@vercel/node" },
+    { "src": "api/trigger.js", "use": "@vercel/node" },
+    { "src": "api/prs.js", "use": "@vercel/node" },
+    { "src": "api/deploy.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/api/telegram", "dest": "api/telegram.js" },
-    { "src": "/api/notify", "dest": "api/notify.js" }
+    { "src": "/api/notify", "dest": "api/notify.js" },
+    { "src": "/api/trigger", "dest": "api/trigger.js" },
+    { "src": "/api/prs", "dest": "api/prs.js" },
+    { "src": "/api/deploy", "dest": "api/deploy.js" }
   ]
 }
