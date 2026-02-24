@@ -375,7 +375,7 @@ export default async function handler(req, res) {
 
           await sendTelegram(
             chatId,
-            `🚀 배포 완료!\n\n` +
+            `🚀 PUSH 완료!\n\n` +
               `• PR #${prNumber} (${prTitle}) 머지됨\n` +
               `• ${releaseMsg}\n` +
               (CI_LOG_URL ? `🔗 CI 로그: ${CI_LOG_URL}` : ""),
